@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -11,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/big"
 	"net"
 	"net/http"
@@ -27,7 +29,7 @@ const (
 	listEndPoint      = "https://api.twitter.com/2/lists"
 )
 
-type Config struct {
+type ClientConfig struct {
 	RedirectUri  string
 	ClientSecret string
 	ClientId     string
@@ -38,6 +40,7 @@ type OAuthSessionData struct {
 	RedirectUri         string
 	Scopes              []string
 	State               string
+	CodeVerifier        string
 	CodeChallenge       string
 	CodeChallengeMethod string
 }
@@ -47,7 +50,9 @@ type MyHandler struct {
 
 func (h *MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello!")
-	fmt.Fprintf(w, r.URL.String())
+	//fmt.Fprintf(w, r.URL.String())
+	w.Header().Set("location", "http://www.yahoo.co.jp/")
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
 func (data *OAuthSessionData) PrepareAuthEndPoint() string {
@@ -67,11 +72,57 @@ func (data *OAuthSessionData) PrepareAuthEndPoint() string {
 	q.Set("code_challenge_method", data.CodeChallengeMethod)
 
 	u.RawQuery = q.Encode()
-	//req, err := http.Get(u.String())
+	escapedUrl := regexp.MustCompile(`([^%])(\+)`).ReplaceAllString(u.String(), "$1%20")
 
-	str := regexp.MustCompile(`([^%])(\+)`).ReplaceAllString(u.String(), "$1%20")
+	return escapedUrl
+}
 
-	return str
+func InitClientConfig() *ClientConfig {
+	err := godotenv.Load()
+	if err != nil {
+		panic("Error loading .env file")
+	}
+
+	redirectUri := os.Getenv("REDIRECT_URI")
+	clientSecret := os.Getenv("CLIENT_SECRET")
+	clientId := os.Getenv("CLIENT_ID")
+
+	config := &ClientConfig{
+		RedirectUri:  redirectUri,
+		ClientSecret: clientSecret,
+		ClientId:     clientId,
+	}
+
+	return config
+}
+
+func createOAuthSession(config *ClientConfig) *OAuthSessionData {
+	c := 300
+	b := make([]byte, c)
+	rand.Read(b)
+	state := base64.StdEncoding.EncodeToString(b)
+
+	scopes := []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"}
+	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
+	if err != nil {
+		log.Fatal(err)
+	}
+	bytes := n.Bytes()
+
+	codeVerifier := base64.RawURLEncoding.EncodeToString(bytes)
+	codeVerifierHash := sha256.Sum256(bytes)
+	codeChallenge := base64.StdEncoding.EncodeToString(codeVerifierHash[:])
+	codeChallengeMethod := "s256"
+
+	return &OAuthSessionData{
+		ClientId:            config.ClientId,
+		RedirectUri:         config.RedirectUri,
+		Scopes:              scopes,
+		State:               state,
+		CodeVerifier:        codeVerifier,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+	}
 }
 
 func oauth2UserTokenWithCredential(client *http.Client, data *OAuthSessionData) {
@@ -95,7 +146,95 @@ func oauth2UserTokenWithCredential(client *http.Client, data *OAuthSessionData) 
 	_ = byteArray
 
 	fmt.Println(authEndPoint)
-	//fmt.Printf("%#v", string(byteArray))1
+	//fmt.Printf("%#v", string(byteArray))
+}
+
+func FrontChannel(client *http.Client, config *ClientConfig) {
+	auth := createOAuthSession(config)
+
+	handler := MyHandler{}
+	_ = http.Server{
+		Addr:    "127.0.0.1:3000",
+		Handler: &handler,
+	}
+
+	oauth2UserTokenWithCredential(client, auth)
+
+	/*
+
+		err = server.ListenAndServe()
+		err := server.ListenAndServeTLS("cert.pem", "key.pem")
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
+}
+
+func BackChannel(client *http.Client, data *OAuthSessionData, config *ClientConfig) string {
+	u, err := url.Parse(tokenEndPoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	q := u.Query()
+	q.Set("code", "code")
+	q.Set("grant_type", config.ClientId)
+	q.Set("redirect_uri", config.RedirectUri)
+	q.Set("client_id", config.ClientId)
+	q.Set("code_verifier", data.CodeVerifier)
+	u.RawQuery = q.Encode()
+
+	str := regexp.MustCompile(`([^%])(\+)`).ReplaceAllString(u.String(), "$1%20")
+
+	req, err := http.NewRequest("POST", str, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.SetBasicAuth(config.ClientId, config.ClientSecret)
+	req.Header.Set("Content-Type: ", "application/x-www-form-urlencoded")
+
+	return str
+}
+
+func main() {
+	client := new(http.Client)
+	config := InitClientConfig()
+
+	FrontChannel(client, config)
+	//BackChannel(client)
+
+	/*
+	   jsonString := "{\"name\":\"test v2 create list\"}"
+	   body := bytes.NewBuffer([]byte(jsonString))
+	   endPoint := "https://api.twitter.com/2/lists"
+
+	   client := new(http.Client)
+
+	   req, err := http.NewRequest(http.MethodPost, endPoint, body)
+	   if err != nil {
+	       log.Fatal(err)
+	   }
+
+	   req.Header.Set("Content-type", "application/json")
+	   req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	   dump, _ := httputil.DumpRequest(req, true)
+	   fmt.Println(string(dump))
+
+	   resp, err := client.Do(req)
+	   if err != nil {
+	       log.Fatal(err)
+	   }
+	   defer resp.Body.Close()
+
+	   byteArray, err := ioutil.ReadAll(resp.Body)
+	   if err != nil {
+	       panic("Error")
+	   }
+	   fmt.Printf("%#v", string(byteArray))
+	*/
+
+	// req.Header.Set("Accept", "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8")
 }
 
 func InitTLS() {
@@ -132,97 +271,4 @@ func InitTLS() {
 		Bytes: x509.MarshalPKCS1PrivateKey(pk),
 	})
 	keyOut.Close()
-}
-
-func FrontChannel(client *http.Client) {
-	err := godotenv.Load()
-	if err != nil {
-		panic("Error loading .env file")
-	}
-
-	redirectUri := os.Getenv("REDIRECT_URI")
-	clientSecret := os.Getenv("CLIENT_SECRET")
-	clientId := os.Getenv("CLIENT_ID")
-
-	handler := MyHandler{}
-	config := Config{
-		RedirectUri:  redirectUri,
-		ClientSecret: clientSecret,
-		ClientId:     clientId,
-	}
-
-	c := 300
-	b := make([]byte, c)
-	rand.Read(b)
-	state := base64.StdEncoding.EncodeToString(b)
-
-	scopes := []string{"tweet.read", "users.read", "list.read", "list.write"}
-	codeChallenge := "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-	codeChallengeMethod := "s256"
-
-	auth := OAuthSessionData{
-		ClientId:            config.ClientId,
-		RedirectUri:         config.RedirectUri,
-		Scopes:              scopes,
-		State:               state,
-		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: codeChallengeMethod,
-	}
-
-	server := http.Server{
-		Addr:    "127.0.0.1:3000",
-		Handler: &handler,
-	}
-
-	oauth2UserTokenWithCredential(client, &auth)
-
-	err = server.ListenAndServe()
-	//err := server.ListenAndServeTLS("cert.pem", "key.pem")
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func BackChannel(client *http.Client) {
-
-}
-
-func main() {
-	client := new(http.Client)
-
-	FrontChannel(client)
-	BackChannel(client)
-
-	/*
-	   jsonString := "{\"name\":\"test v2 create list\"}"
-	   body := bytes.NewBuffer([]byte(jsonString))
-	   endPoint := "https://api.twitter.com/2/lists"
-
-	   client := new(http.Client)
-
-	   req, err := http.NewRequest(http.MethodPost, endPoint, body)
-	   if err != nil {
-	       log.Fatal(err)
-	   }
-
-	   req.Header.Set("Content-type", "application/json")
-	   req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-	   dump, _ := httputil.DumpRequest(req, true)
-	   fmt.Println(string(dump))
-
-	   resp, err := client.Do(req)
-	   if err != nil {
-	       log.Fatal(err)
-	   }
-	   defer resp.Body.Close()
-
-	   byteArray, err := ioutil.ReadAll(resp.Body)
-	   if err != nil {
-	       panic("Error")
-	   }
-	   fmt.Printf("%#v", string(byteArray))
-	*/
-
-	// req.Header.Set("Accept", "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8")
 }
