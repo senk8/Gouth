@@ -22,54 +22,57 @@ const (
 )
 
 type ClientConfig struct {
-	RedirectUri  string
-	ClientSecret string
-	ClientId     string
+	RedirectUri       string
+	ClientSecret      string
+	ClientId          string
+	Scopes            []string
+	AuthorizeEndpoint string
+	TokenEndPoint     string
 }
 
 type OAuthSessionData struct {
 	ClientId            string
 	RedirectUri         string
-	Scopes              []string
 	State               string
 	CodeVerifier        string
 	CodeChallenge       string
 	CodeChallengeMethod string
 }
 
-func createClientConfig() *ClientConfig {
+func createClientConfig(scopes []string, authorizeEndPoint string, tokenEndPoint string) *ClientConfig {
 	err := godotenv.Load()
 	if err != nil {
 		panic("Error loading .env file")
 	}
 
-	redirectUri := os.Getenv("REDIRECT_URI")
-	clientSecret := os.Getenv("CLIENT_SECRET")
-	clientId := os.Getenv("CLIENT_ID")
-
 	config := &ClientConfig{
-		RedirectUri:  redirectUri,
-		ClientSecret: clientSecret,
-		ClientId:     clientId,
+		RedirectUri:       os.Getenv("REDIRECT_URI"),
+		ClientSecret:      os.Getenv("CLIENT_SECRET"),
+		ClientId:          os.Getenv("CLIENT_ID"),
+		Scopes:            scopes,
+		AuthorizeEndpoint: tokenEndPoint,
+		TokenEndPoint:     authorizeEndPoint,
 	}
 
 	return config
 }
 
 func createOAuthSession(config *ClientConfig) *OAuthSessionData {
+	// state
 	c := 300
 	b := make([]byte, c)
 	rand.Read(b)
 	state := base64.StdEncoding.EncodeToString(b)
 
-	scopes := []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"}
+	// code verifier
 	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
 	if err != nil {
 		log.Fatal(err)
 	}
 	bytes := n.Bytes()
-
 	codeVerifier := base64.RawURLEncoding.EncodeToString(bytes)
+
+	// code challenge
 	codeVerifierHash := sha256.Sum256(bytes)
 	codeChallenge := base64.StdEncoding.EncodeToString(codeVerifierHash[:])
 	codeChallengeMethod := "s256"
@@ -77,7 +80,6 @@ func createOAuthSession(config *ClientConfig) *OAuthSessionData {
 	return &OAuthSessionData{
 		ClientId:            config.ClientId,
 		RedirectUri:         config.RedirectUri,
-		Scopes:              scopes,
 		State:               state,
 		CodeVerifier:        codeVerifier,
 		CodeChallenge:       codeChallenge,
@@ -151,7 +153,8 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	config := createClientConfig()
+	scopes := []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"}
+	config := createClientConfig(scopes)
 	FrontChannel(config)
 	srv := &http.Server{
 		Addr: "127.0.0.1:3000",
