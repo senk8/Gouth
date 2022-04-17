@@ -1,8 +1,8 @@
 package oauth
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -36,8 +36,13 @@ func callback(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	fmt.Print(string(body))
+
+	var tokenResponse TokenResponse
+	if err := json.NewDecoder(res.Body).Decode(&tokenResponse); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(tokenResponse.AccessToken)
 
 	return
 }

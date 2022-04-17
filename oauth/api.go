@@ -7,25 +7,6 @@ import (
 	"os"
 )
 
-type ClientConfig struct {
-	RedirectUri       string
-	ClientSecret      string
-	ClientId          string
-	Scopes            []string
-	AuthorizeEndpoint string
-	TokenEndPoint     string
-}
-
-type OAuthSession struct {
-	State               string
-	CodeVerifier        string
-	CodeChallenge       string
-	CodeChallengeMethod string
-}
-
-var config *ClientConfig
-var session *OAuthSession
-
 func init() {
 	err := godotenv.Load()
 	if err != nil {

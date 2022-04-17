@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"log"
-	"math"
-	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -14,7 +12,7 @@ import (
 )
 
 func (session *OAuthSession) buildAuthURL(config *ClientConfig) string {
-	scopesString := strings.Join(session.Scopes, " ")
+	scopesString := strings.Join(config.Scopes, " ")
 	u, err := url.Parse(config.AuthorizeEndpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -35,28 +33,29 @@ func (session *OAuthSession) buildAuthURL(config *ClientConfig) string {
 	return escapedUrl
 }
 
-func createOAuthSession(scopes []string) *OAuthSession {
-	// state
-	c := 128
-	b := make([]byte, c)
+func getRandomString(l int) []byte {
+	b := make([]byte, l)
 	rand.Read(b)
+	return b
+}
+
+func createOAuthSession() *OAuthSession {
+	// state
+	b := getRandomString(80)
 	state := base64.RawURLEncoding.EncodeToString(b)
 
 	// code verifier
-	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
-	if err != nil {
-		log.Fatal(err)
-	}
-	bytes := n.Bytes()
-	codeVerifier := base64.RawURLEncoding.EncodeToString(bytes)
+	b = getRandomString(80)
+	codeVerifier := base64.RawURLEncoding.EncodeToString(b)
 
 	// code challenge
-	codeVerifierHash := sha256.Sum256(bytes)
-	codeChallenge := base64.RawURLEncoding.EncodeToString(codeVerifierHash[:])
+	h := sha256.New()
+	h.Write([]byte(codeVerifier))
+	hashed := h.Sum(nil)
+	codeChallenge := base64.RawURLEncoding.EncodeToString(hashed[:])
 	codeChallengeMethod := "S256"
 
 	return &OAuthSession{
-		Scopes:              scopes,
 		State:               state,
 		CodeVerifier:        codeVerifier,
 		CodeChallenge:       codeChallenge,
@@ -65,8 +64,7 @@ func createOAuthSession(scopes []string) *OAuthSession {
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
-	scopes := []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"}
-	session = createOAuthSession(scopes)
+	session = createOAuthSession()
 	authURL := session.buildAuthURL(config)
 	w.Header().Set("Location", authURL)
 	w.WriteHeader(http.StatusFound)
