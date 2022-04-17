@@ -1,46 +1,43 @@
 package oauth
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
+	"strings"
 )
 
-func buildTokenURL(code string) string {
-	u, err := url.Parse(config.TokenEndPoint)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	q := u.Query()
-	q.Set("code", code)
-	q.Set("grant_type", "authorization_code")
-	q.Set("redirect_uri", config.RedirectUri)
-	q.Set("client_id", config.ClientId)
-	q.Set("code_verifier", session.CodeVerifier)
-	u.RawQuery = q.Encode()
-
-	return regexp.MustCompile(`([^%])(\+)`).ReplaceAllString(u.String(), "$1%20")
-}
-
 func callback(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
+	if session.State != state {
+		log.Println("invalid state")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	code := r.URL.Query().Get("code")
-	url := buildTokenURL(code)
 
-	req, err := http.NewRequest("POST", url, nil)
+	values := url.Values{}
+	values.Set("code", code)
+	values.Add("grant_type", "authorization_code")
+	values.Add("redirect_uri", config.RedirectUri)
+	values.Add("code_verifier", session.CodeVerifier)
+
+	req, err := http.NewRequest(http.MethodPost, config.TokenEndPoint, strings.NewReader(values.Encode()))
 	if err != nil {
 		log.Fatal(err)
 	}
 	req.SetBasicAuth(config.ClientId, config.ClientSecret)
-	req.Header.Set("Content-Type: ", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	/*
-	   res, err := client.Do(req)
-	   if err != nil {
-
-	   }
-	*/
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	fmt.Print(string(body))
 
 	return
 }

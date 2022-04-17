@@ -11,12 +11,12 @@ type ClientConfig struct {
 	RedirectUri       string
 	ClientSecret      string
 	ClientId          string
+	Scopes            []string
 	AuthorizeEndpoint string
 	TokenEndPoint     string
 }
 
 type OAuthSession struct {
-	Scopes              []string
 	State               string
 	CodeVerifier        string
 	CodeChallenge       string
@@ -36,6 +36,7 @@ func init() {
 		RedirectUri:       os.Getenv("REDIRECT_URI"),
 		ClientSecret:      os.Getenv("CLIENT_SECRET"),
 		ClientId:          os.Getenv("CLIENT_ID"),
+		Scopes:            []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"},
 		AuthorizeEndpoint: "https://twitter.com/i/oauth2/authorize",
 		TokenEndPoint:     "https://api.twitter.com/2/oauth2/token",
 	}
@@ -47,9 +48,5 @@ func Run() {
 	}
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/callback", callback)
-	err := srv.ListenAndServe()
-	if err != nil {
-		return
-	}
 	log.Fatal(srv.ListenAndServe())
 }
