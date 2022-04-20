@@ -1,7 +1,9 @@
 package main
 
-import "github.com/senk8/go-twitter-oauth-client/pkg/oauth"
+import (
+	"github.com/senk8/go-twitter-oauth-client/pkg/api"
+)
 
 func main() {
-	oauth.Run()
+	api.Run()
 }

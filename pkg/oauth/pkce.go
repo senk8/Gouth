@@ -1,17 +1,23 @@
 package oauth
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"github.com/senk8/go-twitter-oauth-client/pkg/util"
 	"log"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 )
 
-func (session *OAuthSession) buildAuthURL(config *ClientConfig) string {
+type PKCESession struct {
+	State               string
+	CodeVerifier        string
+	CodeChallenge       string
+	CodeChallengeMethod string
+}
+
+func (session *PKCESession) BuildAuthURL(config *ClientConfig) string {
 	scopesString := strings.Join(config.Scopes, " ")
 	u, err := url.Parse(config.AuthorizeEndpoint)
 	if err != nil {
@@ -33,19 +39,13 @@ func (session *OAuthSession) buildAuthURL(config *ClientConfig) string {
 	return escapedUrl
 }
 
-func getRandomString(l int) []byte {
-	b := make([]byte, l)
-	rand.Read(b)
-	return b
-}
-
-func createOAuthSession() *OAuthSession {
+func CreatePKCESession() *PKCESession {
 	// state
-	b := getRandomString(80)
+	b := util.GetRandomString(80)
 	state := base64.RawURLEncoding.EncodeToString(b)
 
 	// code verifier
-	b = getRandomString(80)
+	b = util.GetRandomString(80)
 	codeVerifier := base64.RawURLEncoding.EncodeToString(b)
 
 	// code challenge
@@ -55,18 +55,10 @@ func createOAuthSession() *OAuthSession {
 	codeChallenge := base64.RawURLEncoding.EncodeToString(hashed[:])
 	codeChallengeMethod := "S256"
 
-	return &OAuthSession{
+	return &PKCESession{
 		State:               state,
 		CodeVerifier:        codeVerifier,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 	}
-}
-
-func login(w http.ResponseWriter, r *http.Request) {
-	session = createOAuthSession()
-	authURL := session.buildAuthURL(config)
-	w.Header().Set("Location", authURL)
-	w.WriteHeader(http.StatusFound)
-	return
 }
