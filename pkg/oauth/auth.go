@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+const (
+	CODE_VERIFIER_LENGTH = 80
+	STATE_LENGTH = 80
+)
+
 type PKCESession struct {
 	State               string
 	CodeVerifier        string
@@ -40,18 +45,13 @@ func (session *PKCESession) BuildAuthURL(config *ClientConfig) string {
 }
 
 func CreatePKCESession() *PKCESession {
-	// state
-	b := util.GetRandomString(80)
-	state := base64.RawURLEncoding.EncodeToString(b)
+	r := util.GetRandomString(STATE_LENGTH)
+	state := base64.RawURLEncoding.EncodeToString(r)
 
-	// code verifier
-	b = util.GetRandomString(80)
-	codeVerifier := base64.RawURLEncoding.EncodeToString(b)
+	r = util.GetRandomString(CODE_VERIFIER_LENGTH)
+	codeVerifier := base64.RawURLEncoding.EncodeToString(r)
 
-	// code challenge
-	h := sha256.New()
-	h.Write([]byte(codeVerifier))
-	hashed := h.Sum(nil)
+	hashed := sha256.Sum256([]byte(codeVerifier))
 	codeChallenge := base64.RawURLEncoding.EncodeToString(hashed[:])
 	codeChallengeMethod := "S256"
 
