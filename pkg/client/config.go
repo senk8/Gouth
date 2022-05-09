@@ -8,19 +8,18 @@ import (
 	"strings"
 )
 
-
 const (
 	responseType = "code"
-	grantType = "authorization_code"
+	grantType    = "authorization_code"
 )
 
 type Config struct {
-	ClientID          string
-	RedirectURI       string
-	ClientSecret      string
-	Scopes            []string
-	AuthzEndpoint 	  string
-	TokenEndPoint     string
+	ClientID      string
+	RedirectURI   string
+	ClientSecret  string
+	Scopes        []string
+	AuthzEndpoint string
+	TokenEndPoint string
 }
 
 type OAuth2Config interface {
@@ -28,7 +27,7 @@ type OAuth2Config interface {
 	buildTokenRequest(code string, codeVerifier string) *http.Request
 }
 
-var _ OAuth2Config= (*Config)(nil)
+var _ OAuth2Config = (*Config)(nil)
 
 func (config *Config) buildAuthzURL(session *Session) string {
 	scopesString := strings.Join(config.Scopes, " ")

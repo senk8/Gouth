@@ -12,7 +12,7 @@ const (
 )
 
 type Client struct {
-	client *http.Client
+	client  *http.Client
 	config  *Config
 	session *Session
 	ch      chan *TokenResponse
@@ -28,8 +28,8 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
 	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresIn int `json:"expires_in,omitempty"`
-	Scope string `json:"scope,omitempty"`
+	ExpiresIn    int    `json:"expires_in,omitempty"`
+	Scope        string `json:"scope,omitempty"`
 }
 
 var _ OAuth2Client = (*Client)(nil)

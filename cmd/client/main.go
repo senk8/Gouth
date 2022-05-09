@@ -1,13 +1,13 @@
 package main
 
 import (
-"context"
-"fmt"
-"log"
-"os"
+	"context"
+	"fmt"
+	"log"
+	"os"
 
-"github.com/joho/godotenv"
-"github.com/senk8/oauth-entities/pkg/client"
+	"github.com/joho/godotenv"
+	"github.com/senk8/oauth-entities/pkg/client"
 )
 
 const (
