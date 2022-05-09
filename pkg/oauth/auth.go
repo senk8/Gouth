@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	CODE_VERIFIER_LENGTH = 80
-	STATE_LENGTH = 80
+	CODE_VERIFIER_LENGTH = 32
+	STATE_LENGTH         = 32
 )
 
 type PKCESession struct {
@@ -31,8 +31,8 @@ func (session *PKCESession) BuildAuthURL(config *ClientConfig) string {
 
 	q := u.Query()
 	q.Set("response_type", "code")
-	q.Set("client_id", config.ClientId)
-	q.Set("redirect_uri", config.RedirectUri)
+	q.Set("client_id", config.ClientID)
+	q.Set("redirect_uri", config.RedirectURI)
 	q.Set("scope", scopesString)
 	q.Set("state", session.State)
 	q.Set("code_challenge", session.CodeChallenge)
