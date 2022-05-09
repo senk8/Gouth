@@ -1,10 +1,10 @@
 package client
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"github.com/senk8/oauth-entities/pkg/util"
 )
 
 const (
@@ -21,10 +21,10 @@ type Session struct {
 }
 
 func newSession() *Session {
-	r := getRandomBytes(stateLength)
+	r := util.GetRandomBytes(stateLength)
 	state := base64.RawURLEncoding.EncodeToString(r)
 
-	r = getRandomBytes(codeVerifierLength)
+	r = util.GetRandomBytes(codeVerifierLength)
 	codeVerifier := base64.RawURLEncoding.EncodeToString(r)
 
 	h := sha256.Sum256([]byte(codeVerifier))
@@ -38,13 +38,4 @@ func newSession() *Session {
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 	}
-}
-
-func getRandomBytes(l int) []byte {
-	b := make([]byte, l)
-	_, err := rand.Read(b)
-	if err != nil {
-		panic(err)
-	}
-	return b
 }

@@ -2,7 +2,7 @@ package util
 
 import "crypto/rand"
 
-func GetRandomString(l int) []byte {
+func GetRandomBytes(l int) []byte {
 	b := make([]byte, l)
 	_, err := rand.Read(b)
 	if err != nil {
