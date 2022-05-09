@@ -1,4 +1,4 @@
-module github.com/senk8/go-twitter-oauth-client
+module github.com/senk8/oauth-entities
 
 go 1.17
 

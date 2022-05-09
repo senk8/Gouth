@@ -1,33 +1,38 @@
 package main
 
 import (
-	"context"
-	"github.com/joho/godotenv"
-	"github.com/senk8/go-twitter-oauth-client/pkg/oauth"
-	"log"
-	"os"
+"context"
+"fmt"
+"log"
+"os"
+
+"github.com/joho/godotenv"
+"github.com/senk8/oauth-entities/pkg/client"
+)
+
+const (
+	authzEndpoint = "https://twitter.com/i/oauth2/authorize"
+	tokenEndpoint = "https://api.twitter.com/2/oauth2/token"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		panic("Error loading .env file")
+		log.Fatal(err)
 	}
-
-	config := &oauth.ClientConfig{
-		RedirectURI:       os.Getenv("REDIRECT_URI"),
-		ClientSecret:      os.Getenv("CLIENT_SECRET"),
-		ClientID:          os.Getenv("CLIENT_ID"),
-		Scopes:            []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"},
-		AuthorizeEndpoint: "https://twitter.com/i/oauth2/authorize",
-		TokenEndPoint:     "https://api.twitter.com/2/oauth2/token",
+	config := &client.Config{
+		ClientID:      os.Getenv("CLIENT_ID"),
+		ClientSecret:  os.Getenv("CLIENT_SECRET"),
+		RedirectURI:   os.Getenv("REDIRECT_URI"),
+		Scopes:        []string{"tweet.read", "users.read", "list.read", "list.write", "offline.access"},
+		AuthzEndpoint: authzEndpoint,
+		TokenEndPoint: tokenEndpoint,
 	}
-	client := oauth.CreateOAuthClient(config)
-
-	token, err := client.GenerateAccessToken(context.Background())
+	ctx := context.Background()
+	oauth := client.New(config)
+	tokenResponse, err := oauth.ExecFlow(ctx)
 	if err != nil {
-		log.Fatalf("failed to generate access token: %v", err)
+		log.Fatal(err)
 	}
-
-	log.Println(token)
+	fmt.Println(tokenResponse.AccessToken)
 }
